@@ -9,11 +9,11 @@ subdirs :
 	mkdir -p src-bnfc l4 out
 
 out/test.out : l4/test.l4 src-bnfc/AbsL.hs
-	stack exec l4 l4/test.l4 > out/test.out 2> out/test.err || stack run showbug l4/test.l4 out/test.out out/test.err
+	stack run l4 l4/test.l4 > out/test.out 2> out/test.err || stack run showbug l4/test.l4 out/test.out out/test.err
 	dot -Tpng graph.dot > graph.png
 
 src-bnfc/AbsL.hs : l4.bnfc src-l4/Top.hs
-	(mkdir -p src-bnfc out; cd src-bnfc; bnfc -m ../l4.bnfc > ../out/bnfc.out 2> ../out/bnfc.err || stack run showbug ../l4.bnfc ../out/bnfc.out ../out/bnfc.err ; rm TestL.hs; make ParL.hs; rm ParL.hs)
+	(mkdir -p src-bnfc out; cd src-bnfc; bnfc -m ../l4.bnfc ; rm TestL.hs; make ParL.hs; rm ParL.hs)
 	# (cd src-bnfc; bnfc --haskell ../l4.bnfc; rm TestL.hs)
 	stack build
 

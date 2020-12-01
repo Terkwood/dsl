@@ -24,7 +24,8 @@ jobs:
         # If you chose API tokens for write access OR if you have a private cache
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     # Run the general flake checks
-    - run: nix flake check
+    # Don't do this, since IFD makes the situation sad
+    # - run: nix flake check
     # Verify that the main program builds
     - run: nix shell -c echo OK
     # Verify that the main program builds

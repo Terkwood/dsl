@@ -28,8 +28,8 @@ jobs:
     # - run: nix flake check
     #  working-directory: bnfc
     # Verify that the main program builds
-    - run: nix develop -c echo OK
+    - run: nix develop -L -c echo OK
       working-directory: bnfc
     # Verify that the main program builds
-    - run: nix develop -c make test
+    - run: nix develop -L -vvvv -c make test
       working-directory: bnfc

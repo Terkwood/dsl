@@ -26,7 +26,10 @@ jobs:
     # Run the general flake checks
     # Don't do this, since IFD makes the situation sad
     # - run: nix flake check
+    #  working-directory: bnfc
     # Verify that the main program builds
     - run: nix shell -c echo OK
+      working-directory: bnfc
     # Verify that the main program builds
     - run: nix shell -c make test
+      working-directory: bnfc

@@ -41,7 +41,6 @@ run v gr p s = case p ts of
       putStrLn s
       exitFailure
     Right tree -> do
-      putStrLn "\nParse Successful!"
       showTree gr v tree
 
       exitSuccess
@@ -58,20 +57,7 @@ prettyPrintParseTree = fmap pShowNoColor . simpleParseTree
 showTree :: PGF -> Int -> Tops -> IO ()
 showTree gr v tree0
  = let tree = rewriteTree tree0 in do
-      printMsg "Abstract Syntax" $ T.unpack (pShowNoColor tree)
-      printMsg "Linearized tree" $ printTree tree
-      printMsg "In English" $ bnfc2str gr tree
-      let ruleList = getRules tree
-      printMsg "Just the Names" $ unlines $ showRuleName <$> ruleList
-      printMsg "Dictionary of Name to Rule" $ T.unpack (pShow $ nameList ruleList)
-      printMsg "Rule to Exit" $ T.unpack (pShow $ (\r -> (showRuleName r, ruleExits r)) <$> ruleList)
-      printMsg "As Graph" ""
-      printGraph ruleList
-      printMsg "As Dotfile" ""
-      putStrLn $ showDot ruleList
-      writeFile "graph.dot" (showDot ruleList)
-  where
-    printMsg msg result = putStrV v $ "\n[" ++ msg ++ "]\n\n" ++ result
+      putStrLn  $ bnfc2str gr tree
 
 
 rewriteTree :: Tops -> Tops

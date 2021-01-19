@@ -19,9 +19,7 @@ bnfc2str :: PGF -> Tops -> String
 bnfc2str gr tops =
   unlines
     [ unlines
-        [ unlines $ linearizeAll gr tree,
-          "Abstract syntax tree in GF:",
-          showExpr [] tree
+        [ unlines $ linearizeAll gr tree
         ]
       | tree <- toGF tops
     ]

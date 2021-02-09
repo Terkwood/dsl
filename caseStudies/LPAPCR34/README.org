@@ -229,7 +229,7 @@ scenario: a lawyer wants to make an indie movie on the side because of his lifel
 
 #+begin_src haskell :noweb-ref 34-types
   data Stm = Section TermExpr -- first TermExpr should always be an NL expression (:@)
-           | DRule { rulename :: TermExpr
+           | DRule { rulename :: TermExpr -- deontic rule
                    , party  :: TermExpr
                    , dmodal :: Deontic
                    , action :: TermExpr
@@ -237,7 +237,7 @@ scenario: a lawyer wants to make an indie movie on the side because of his lifel
                    }
            | CRule { rulename :: TermExpr
                    , item :: TermExpr
-                   , body :: TermExpr
+                   , body :: TermExpr -- UnOp ISA x    vs    UnOp HAS x
                    , when :: Maybe TermExpr
                    }
     deriving (Show, Eq)
@@ -248,6 +248,11 @@ scenario: a lawyer wants to make an indie movie on the side because of his lifel
                 | Any [TermExpr]               -- or  -- only one element is needed to be true
                 | And [TermExpr]               -- set union! inclusive "and" is not a logical "and"! more of an "or"
                 | BinOp TermExpr BinOp TermExpr -- ace "of" bass, useful when either lhs or rhs term is itself an All/Any list
+                | UnOp UnOp TermExpr
+                | TE0                          -- nil
+    deriving (Show, Eq)
+
+  data UnOp = HasAttr
     deriving (Show, Eq)
 
   data BinOp = Cons
@@ -344,6 +349,10 @@ The emojis above are part of the syntactic sugar used to create the actual AST.
   telist2conslist (te:[]) = te
   telist2conslist (t:tes) = BinOp t Cons (telist2conslist tes)
 
+  -- StringValue -> BinOp "hasAttr" Compound StringValue
+  hasAttr :: TermExpr -> TermExpr
+  hasAttr te = UnOp HasAttr te
+
   -- executive appointment IS associatedWith Something
   -- becomes, in prolog, associatedWith(ExecutiveAppointment, Something)
   -- which is basically a bit of a flip and rearrangement of the above
@@ -364,6 +373,11 @@ The emojis above are part of the syntactic sugar used to create the actual AST.
   type MkCRule = TermExpr -> TermExpr -> TermExpr -> TermExpr -> Stm
   (§=§) :: MkCRule
   (§=§) a b c d = CRule a b c (Just d)
+
+  -- attribute constructors
+  type MkDefs = TermExpr -> TermExpr -> TermExpr -> Stm
+  (§.=§) :: MkCRule
+  (§.=§) a b = CRule a (UnaOp HasAttr b) Nothing
 
   instance Semigroup TermExpr where (<>) x y = BinOp x Cons y
 
@@ -940,6 +954,87 @@ This is a work in progress.
 
 **** Let's try outputting to Prolog
 
+First, a little theory.
+
+Prolog is cool with compound terms: anywhere you can have a =plain(term)=, you can =have(a(compound(term)))=.
+
+Now, the AST contains a lot of structure, the =BinOp= tree is basically expressive enough to do any kind of GF-style natural language grammar, e.g. "half of a potato" would be broken out to the (mostly binary) tree =of(half,a(potato))=.
+
+Prolog doesn't need quite that much structure: typically we would just deal with that notion as a single concept =half_of_a_potato=.
+
+To get that we linearize the tree DFS left-to-right; if the compound term has only one argument, we treat the argument as a right argument: so it's really =of(half,a((),potato))=.
+
+What if the semantics require a different kind of break down? What if we want =half_of(a_potato)=? We'll cross this bridge when we come to it.
+
+So, that's the basic theory behind linearization of the AST to Prolog.
+
+What special cases might we need to consider?
+
+In the AST Meng defined =compl= as "complement", when it's not obvious what the connector? preposition? should be: "half a potato". The "of" is dropped, so we just use "compl" as the binary operator; and when we linearize, we just drop that too.
+
+What if a term involves a variable? Like, suppose we have "half of a green Fruit". We don't want to say =half_of_a_green_Fruit= because that jams the =Fruit= variable into the term; it should be separate.
+
+What would work? Let's work toward more structure:
+
+1. =half_of_a_green_Fruit= -- not enough structure
+2. =half_of_a_green(Fruit)= -- Fruit stands alone, good
+3. =half_of_a(green,Fruit)= -- looking ahead to the future, we will probably want to have =(Color,Fruit)= in the future
+4. =half_of(a(green,Fruit))= -- we know from grammar that the "a" determiner applies to "green fruit", so we try to structure it accordingly
+5. =of(half,a(green,Fruit))= -- this is a fully structured version, at least where Prolog is concerned
+
+But we note that this structure doesn't really match the "binary tree" we described above: a linearization of =a(green,Fruit)= would give "green a Fruit". So we should keep in mind that the binary tree in the AST doesn't look exactly the same as a binary tree in Prolog.
+
+In the AST, the binary tree would be something like:
+
+- of
+  - half
+  - ()
+    - a
+    - ()
+      - green
+      - fruit
+
+What's up with that ()? It's needed if we have a rule that we linearize a =BinOp l op s= to =l op s=.
+
+This is awkward. How are we to represent something like =a happy beautiful green fruit=?
+
+- ()
+  - a
+  - ()
+    - happy
+    - ()
+      - beautiful
+      - ()
+        - green
+          - ()
+          - fruit
+
+All the left-hand elements are nil. Honestly, this feels more like a list than a binary tree; to be precise, a cons-list.
+
+- Cons
+  - a
+  - Cons
+    - happy
+    - Cons
+      - beautiful
+      - Cons
+        - green
+        - fruit
+
+So, fine, we have argued ourselves into having =Cons= as a =BinOp= data constructor.
+
+Back to the original question: how do we linearize? We know that linearization is affected by whether a node is a =Variable= (uppercase) or a non-variable =term=.
+
+Let's look at some desired inputs and outputs; from that, we'll know what code to write.
+
+The location probably affects the linearization, too, so let's keep a input column for that.
+
+
+| Input                                                                 | location | Output        |
+|-----------------------------------------------------------------------+----------+---------------|
+| BinOp ( "detracts" :@ [ ( "en" , "detracts" ) ] ) Cons ( "from" :@ [] |          | detracts_from |
+|                                                                       |          |               |
+
 #+begin_src haskell :noweb-ref 34-prolog
   stmToPlain :: Stm -> String
   stmToPlain (Section te) = plain te
@@ -1139,6 +1234,36 @@ BUT NOT
 There is synecdoche going on here -- 34.1.b is a predicate constraining businesses, but 34.5 casts it to a deontic deny, implicitly including the context of the introductory text of 34.1 above in the "parent".
 
 ** Section 6
+
+** Let's also do the super simple case that we whiteboarded in January:
+
+#+begin_src haskell :noweb-ref 34-haskell
+  superSimple1 :: Stm
+  superSimple1 =
+    (§.=§) -- attribute definition
+    ("superSimple1" 💬 "Super Simple Whiteboard Example") -- rulename
+    ("Business" 💬 "Business")                            -- entity
+    ("is_legal" 💬 "legal")                               -- property / attribute
+#+end_src
+
+The original whiteboard text, btw:
+
+#+begin_src text :tangle test/supersimple.l4
+  Type Business (12345):
+    is_operating (23456): boolean
+    bus_name: string
+
+  megaCorp : Business
+
+  megaCorp.is_operating = true
+  megaCorp.bus_name = "Mega"
+
+  QUERY
+    megaCorp.is_operating
+#+end_src
+
+A Megaparsec parser for the above has been done by Jacob, see =sandbox/jacobtan/baby-l4=
+
 
 * Language Notes
 
